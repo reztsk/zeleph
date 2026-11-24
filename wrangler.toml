@@ -1,5 +1,5 @@
 # Zeleph : un seul Worker Cloudflare = PWA (fichiers statiques) + API (/api/*). Même origine → zéro CORS.
-# Rien n'est déployé tant que tu ne lances pas `npm run deploy`.
+# Déploiement : `npm run deploy` (tests puis wrangler deploy).
 name = "zeleph"
 main = "worker/index.js"
 compatibility_date = "2026-11-01"
@@ -12,19 +12,18 @@ binding = "ASSETS"
 enabled = true
 
 # Variables non secrètes. Secrets (jamais ici) : npx wrangler secret put BREVO_API_KEY
+# Sans BREVO_SENDER_EMAIL + BREVO_API_KEY, l'inscription répond 503 (« envoi des e-mails indisponible ») : aucun code ne fuit.
 [vars]
-BREVO_SENDER_EMAIL = "noreply@exemple.fr"   # À REMPLACER : expéditeur validé dans Brevo (Expéditeurs & IP)
+# BREVO_SENDER_EMAIL = "noreply@ton-domaine.fr"   # expéditeur validé dans Brevo (Expéditeurs, domaines & IP)
 BREVO_SENDER_NAME = "Zeleph"
 # EXTRACTOR_URL = "https://extracteur.ton-domaine.fr"   # optionnel : extracteur audio dédié (dossier extractor/)
 
-# Base de données : créer avec `npx wrangler d1 create zeleph` puis coller l'id ci-dessous.
 [[d1_databases]]
 binding = "DB"
 database_name = "zeleph"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "8b08ecb7-9cba-4ae7-af0c-d6a1436d1e4c"
 
-# Cache des flux audio résolus (~4 h) partagé entre data centers. Optionnel mais recommandé :
-# `npx wrangler kv namespace create CACHE` puis décommenter avec l'id obtenu.
-# [[kv_namespaces]]
-# binding = "CACHE"
-# id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# Cache des flux audio résolus (~4 h) partagé entre data centers.
+[[kv_namespaces]]
+binding = "CACHE"
+id = "8dbae757c8634543b36a847c2566c393"

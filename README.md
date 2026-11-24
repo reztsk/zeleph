@@ -63,7 +63,16 @@ docker run -d --restart unless-stopped -e EXTRACTOR_TOKEN=<longue-chaine-aleatoi
 cloudflared tunnel --url http://localhost:8788     # ou un tunnel nommé sur ton domaine
 ```
 
+Sans Docker, sous Windows (Node + yt-dlp.exe) :
+
+```powershell
+$env:EXTRACTOR_TOKEN="<longue-chaine-aleatoire>"; $env:YTDLP="C:\chemin\yt-dlp.exe"; node extractor/server.mjs
+```
+
 Puis côté Worker : `EXTRACTOR_URL` dans `[vars]` et `npx wrangler secret put EXTRACTOR_TOKEN` (même valeur).
+
+> Constaté le 24/11/2026 : depuis les IP Cloudflare, la recherche YouTube Music fonctionne mais la lecture est refusée
+> (« confirmez que vous n'êtes pas un robot »). **En production, l'extracteur est indispensable pour lire la musique.**
 
 ## Partager avec tes amis
 
