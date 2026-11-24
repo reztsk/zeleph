@@ -17,7 +17,7 @@ function audioResponse(up, mime) {
 async function viaExtractor(c, vid, range) {
   const base = String(c.env.EXTRACTOR_URL).replace(/\/+$/, '');
   try {
-    const up = await fetch(`${base}/audio/${vid}`, { method: c.req.method, headers: { authorization: `Bearer ${c.env.EXTRACTOR_TOKEN ?? ''}`, ...(range && { range }) }, signal: AbortSignal.timeout(20000) });
+    const up = await fetch(`${base}/audio/${vid}`, { method: c.req.method, headers: { authorization: `Bearer ${String(c.env.EXTRACTOR_TOKEN ?? '').trim().replace(/^﻿/, '')}`, ...(range && { range }) }, signal: AbortSignal.timeout(20000) });
     if (up.ok) return audioResponse(up, up.headers.get('content-type'));
     console.error('extracteur : statut', up.status);
   } catch (e) { console.error('extracteur : réseau', e.name); }

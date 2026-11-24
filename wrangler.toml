@@ -14,7 +14,7 @@ enabled = true
 # Variables non secrètes. Secrets (jamais ici) : npx wrangler secret put BREVO_API_KEY
 # Sans BREVO_SENDER_EMAIL + BREVO_API_KEY, l'inscription répond 503 (« envoi des e-mails indisponible ») : aucun code ne fuit.
 [vars]
-# BREVO_SENDER_EMAIL = "noreply@ton-domaine.fr"   # expéditeur validé dans Brevo (Expéditeurs, domaines & IP)
+BREVO_SENDER_EMAIL = "noreply@rezcollection.online"   # expéditeur validé dans Brevo (Expéditeurs, domaines & IP)
 BREVO_SENDER_NAME = "Zeleph"
 EXTRACTOR_URL = "https://p01--zelpeh--rnknjq6jycvp.code.run"   # extracteur audio dédié Northflank (dossier extractor/)
 

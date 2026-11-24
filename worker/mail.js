@@ -38,10 +38,10 @@ export async function sendOtp(env, to, kind, code, minutes) {
   try {
     res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
-      headers: { 'api-key': env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
+      headers: { 'api-key': String(env.BREVO_API_KEY).trim().replace(/^﻿/, ''), 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify({ sender: { name: env.BREVO_SENDER_NAME || APP, email: env.BREVO_SENDER_EMAIL }, to: [{ email: to }], subject, htmlContent: html, textContent: text }),
       signal: AbortSignal.timeout(8000),
     });
   } catch (e) { console.error('mail : réseau', e.name); fail(502, 'mail_fail', 'Envoi du code impossible, réessaie dans un instant'); }
-  if (!res.ok) { console.error('mail : refusé par Brevo', res.status); fail(502, 'mail_fail', 'Envoi du code impossible, réessaie dans un instant'); } // jamais la clé ni le corps de réponse dans les journaux
+  if (!res.ok) { console.error('mail : refusé par Brevo', res.status, await res.text().catch(() => '')); fail(502, 'mail_fail', 'Envoi du code impossible, réessaie dans un instant'); } // corps d'erreur Brevo loggé pour diagnostic ; jamais la clé
 }
