@@ -6,6 +6,7 @@ name: Déploiement
 on:
   push:
     branches: [main]
+    paths-ignore: ['ios/**', 'apps.json', '.github/workflows/build-ipa.yml'] # app iOS : voir build-ipa.yml
   workflow_dispatch:
 
 concurrency:

@@ -1,0 +1,69 @@
+# Application iOS native : chaque push sur main touchant ios/ → .ipa non signé (AltStore le signe à l'installation)
+# → GitHub Release v1.0.<n° de run> → apps.json (source AltStore Classic) mis à jour et poussé sur main.
+name: Compilation iOS (.ipa)
+
+on:
+  push:
+    branches: [main]
+    paths: ['ios/**', '.github/workflows/build-ipa.yml', 'tools/altstore.mjs']
+  workflow_dispatch:
+
+concurrency:
+  group: build-ipa
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  ipa:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    env:
+      VERSION: 1.0.${{ github.run_number }}
+      BUILD: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Projet Xcode (XcodeGen)
+        run: |
+          brew install xcodegen
+          cd ios && xcodegen generate
+
+      - name: Compilation sans signature
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/Zeleph.xcodeproj -scheme Zeleph -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tee build.log | grep -E 'error:|warning: unre|BUILD (SUCCEEDED|FAILED)' || true
+          test -d build/Build/Products/Release-iphoneos/Zeleph.app
+
+      - name: Erreurs de compilation
+        if: failure()
+        run: grep -E 'error:' build.log | head -40 || true
+
+      - name: Empaquetage Zeleph.ipa
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/Zeleph.app Payload/
+          zip -qry Zeleph.ipa Payload
+          echo "SIZE=$(stat -f%z Zeleph.ipa)" >> "$GITHUB_ENV"
+
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$VERSION" Zeleph.ipa --target "$GITHUB_SHA" --title "Zeleph $VERSION" \
+            --notes "Compilation automatique du commit ${GITHUB_SHA::7}. À installer via la source AltStore : https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/apps.json"
+
+      - name: Source AltStore (apps.json)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          node tools/altstore.mjs "$VERSION" "$BUILD" "$SIZE" "https://github.com/${GITHUB_REPOSITORY}/releases/download/v$VERSION/Zeleph.ipa"
+          git add apps.json
+          git commit -m "AltStore : Zeleph $VERSION [skip ci]"
+          git push origin HEAD:main

@@ -10,7 +10,7 @@
     "db:init:remote": "wrangler d1 execute zeleph --remote --file=worker/schema.sql",
     "icons": "node tools/icons.mjs",
     "check": "node tools/check.mjs",
-    "test": "node tools/check.mjs && node --test test/unit.test.mjs test/api.test.mjs",
+    "test": "node tools/check.mjs && node --test test/unit.test.mjs test/api.test.mjs test/altstore.test.mjs",
     "test:live": "node --test test/live.test.mjs",
     "test:extractor": "node --test test/extractor.test.mjs",
     "build": "wrangler deploy --dry-run --outdir .wrangler/dry",

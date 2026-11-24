@@ -1,0 +1,34 @@
+# Projet Xcode généré par XcodeGen (`xcodegen generate` dans ios/) : aucun .xcodeproj versionné.
+name: Zeleph
+options:
+  bundleIdPrefix: com.reztsk
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Zeleph:
+    type: application
+    platform: iOS
+    sources: [Zeleph]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.reztsk.zeleph
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+    info:
+      path: Zeleph/Info.plist
+      properties:
+        CFBundleDisplayName: Zeleph
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UIBackgroundModes: [audio]
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIUserInterfaceStyle: Dark
+        ITSAppUsesNonExemptEncryption: false
