@@ -16,7 +16,7 @@ enabled = true
 [vars]
 # BREVO_SENDER_EMAIL = "noreply@ton-domaine.fr"   # expéditeur validé dans Brevo (Expéditeurs, domaines & IP)
 BREVO_SENDER_NAME = "Zeleph"
-# EXTRACTOR_URL = "https://extracteur.ton-domaine.fr"   # optionnel : extracteur audio dédié (dossier extractor/)
+EXTRACTOR_URL = "https://p01--zelpeh--rnknjq6jycvp.code.run"   # extracteur audio dédié Northflank (dossier extractor/)
 
 [[d1_databases]]
 binding = "DB"
