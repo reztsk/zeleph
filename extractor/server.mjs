@@ -57,16 +57,16 @@ function remux(id) {
   const p = stat(file).then(() => file, async () => {
     let why = '';
     for (let i = 0; i < 2; i++) {
-      const s = await resolve(id, i > 0);
       const part = `${file}.part`;
       try {
+        const s = await resolve(id, i > 0); // échec yt-dlp souvent passager (contrôle anti-robot) : retenté aussi
         await run('ffmpeg', ['-nostdin', '-loglevel', 'error', '-y', '-user_agent', s.ua, '-i', s.url, '-vn', '-c', 'copy', '-movflags', '+faststart', '-f', 'ipod', part], { timeout: 120000 });
         await rename(part, file);
         prune();
         return file;
-      } catch (e) { why = lastLine(e.stderr || e.message); await unlink(part).catch(() => {}); } // URL expirée : nouvelle extraction une fois
+      } catch (e) { why = e.stderr ? `ffmpeg : ${lastLine(e.stderr)}` : lastLine(e.message); await unlink(part).catch(() => {}); } // URL expirée : nouvelle extraction une fois
     }
-    throw new Error(`remux impossible : ${why}`);
+    throw new Error(why);
   }).finally(() => jobs.delete(id));
   jobs.set(id, p);
   return p;
@@ -101,5 +101,5 @@ createServer(async (req, res) => {
   try {
     const file = await remux(m[1]);
     serve(req, res, file, (await stat(file)).size);
-  } catch (e) { console.error(m[1], e.message); res.statusCode = 502; res.end(e.message); }
+  } catch (e) { console.error(m[1], e.message); res.statusCode = 422; res.end(e.message); } // pas 5xx : le proxy remplacerait le corps (« error code: 502 »)
 }).listen(PORT, process.env.HOST || '0.0.0.0', () => console.log(`extracteur Zeleph sur ${process.env.HOST || '0.0.0.0'}:${PORT}`));
