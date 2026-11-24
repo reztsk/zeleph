@@ -52,9 +52,19 @@ npm run build            # compilation Cloudflare à blanc (wrangler --dry-run)
 6. `npm run deploy` → l'adresse `https://zeleph.<ton-sous-domaine>.workers.dev` s'affiche
    (ou ajouter un domaine perso dans le tableau de bord Cloudflare).
 
-### Extracteur dédié (si YouTube bloque les IP Cloudflare)
+### Extracteur dédié (indispensable : YouTube bloque les IP Cloudflare)
 
-Sur un PC ou un petit serveur (IP résidentielle de préférence) :
+**Sur un VPS** (Debian 12 / Ubuntu 22.04+, 1 vCPU / 1 Go suffisent), en une commande, HTTPS automatique sans DNS :
+
+```bash
+scp extractor/server.mjs extractor/install.sh root@IP_DU_VPS:/root/
+ssh root@IP_DU_VPS 'EXTRACTOR_TOKEN=<longue-chaine-aleatoire> bash /root/install.sh'
+```
+
+Le script installe Node, yt-dlp (mis à jour chaque jour), un service systemd et Caddy (Let's Encrypt sur
+`<ip-avec-tirets>.sslip.io`, ou sur ton domaine passé en argument). Il affiche l'URL à mettre dans `EXTRACTOR_URL`.
+
+**Avec Docker** (PC ou serveur) :
 
 ```bash
 cd extractor

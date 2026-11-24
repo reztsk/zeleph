@@ -6,6 +6,6 @@ RUN apk add --no-cache python3 ca-certificates \
 WORKDIR /app
 COPY server.mjs .
 USER node
-ENV PORT=8788 YTDLP_ARGS="--js-runtimes node"
+ENV PORT=8788
 EXPOSE 8788
 CMD ["node", "server.mjs"]
