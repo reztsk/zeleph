@@ -1,10 +1,10 @@
 import { fail, HttpError, VID_RE } from './util.js';
 import { resolveAudio } from './yt.js';
-import { cached, forget, flag } from './cache.js';
+import { cached, forget } from './cache.js';
 
 // Flux audio relayé par le Worker (les URL googlevideo sont liées à l'IP qui les a demandées) avec prise en charge
 // des requêtes Range (indispensable pour Safari iOS : lecture, avance rapide, écran verrouillé).
-// Ordre : extraction directe InnerTube (URL en cache ~4 h) → sinon extracteur dédié (EXTRACTOR_URL) si configuré.
+// Ordre : extracteur dédié (EXTRACTOR_URL, M4A remuxé) si configuré → sinon extraction directe InnerTube (URL en cache ~4 h).
 const TTL = 4 * 3600;
 const BOT = /robot|bot|sign in|connectez-vous|LOGIN_REQUIRED/i;
 
@@ -16,11 +16,14 @@ function audioResponse(up, mime) {
 
 async function viaExtractor(c, vid, range) {
   const base = String(c.env.EXTRACTOR_URL).replace(/\/+$/, '');
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 45000); // délai sur les en-têtes seulement (1er remux d'un long titre), jamais sur le flux
   try {
-    const up = await fetch(`${base}/audio/${vid}`, { method: c.req.method, headers: { authorization: `Bearer ${String(c.env.EXTRACTOR_TOKEN ?? '').trim().replace(/^﻿/, '')}`, ...(range && { range }) }, signal: AbortSignal.timeout(20000) });
+    const up = await fetch(`${base}/audio/${vid}`, { method: c.req.method, headers: { authorization: `Bearer ${String(c.env.EXTRACTOR_TOKEN ?? '').trim().replace(/^﻿/, '')}`, ...(range && { range }) }, signal: ctl.signal });
     if (up.ok) return audioResponse(up, up.headers.get('content-type'));
+    if (up.status === 416) return new Response(null, { status: 416, headers: { 'content-range': up.headers.get('content-range') ?? '' } });
     console.error('extracteur : statut', up.status);
   } catch (e) { console.error('extracteur : réseau', e.name); }
+  finally { clearTimeout(t); }
   return null;
 }
 
@@ -30,27 +33,21 @@ export async function stream(c, vid) {
   if (range && !/^bytes=\d*-\d*$/.test(range)) fail(416, 'bad_range', 'Plage invalide');
   const key = `au:${vid}`;
   let reason = 'Lecture impossible pour ce titre';
-  if (!(c.env.EXTRACTOR_URL && flag.get('direct-blocked'))) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      let s;
-      try {
-        s = await cached(c.env, key, TTL, async () => {
-          const r = await resolveAudio(c.env, vid);
-          if (r.error) throw new HttpError(502, 'no_audio', r.error);
-          return r;
-        }, { kv: true });
-      } catch (e) {
-        reason = e.message;
-        if (BOT.test(reason) && c.env.EXTRACTOR_URL) flag.set('direct-blocked', 600); // IP du Worker bloquée : extracteur pendant 10 min
-        break;
-      }
-      const up = await fetch(s.url, { method: c.req.method, headers: { 'user-agent': s.ua, ...(range && { range }) } }).catch(() => null);
-      if (up?.ok) return audioResponse(up, s.mime);
-      if (up?.status === 416) return new Response(null, { status: 416, headers: { 'content-range': up.headers.get('content-range') ?? '' } });
-      await forget(c.env, key, { kv: true }); // URL expirée ou liée à une autre IP : on la redemande une fois
-      if (attempt === 1 && c.env.EXTRACTOR_URL) flag.set('direct-blocked', 600);
-    }
-  }
+  // Extracteur d'abord : il sert un M4A classique lisible par Safari iOS ; le flux direct (M4A DASH fragmenté) reste en secours.
   if (c.env.EXTRACTOR_URL) { const r = await viaExtractor(c, vid, range); if (r) return r; }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let s;
+    try {
+      s = await cached(c.env, key, TTL, async () => {
+        const r = await resolveAudio(c.env, vid);
+        if (r.error) throw new HttpError(502, 'no_audio', r.error);
+        return r;
+      }, { kv: true });
+    } catch (e) { reason = e.message; break; }
+    const up = await fetch(s.url, { method: c.req.method, headers: { 'user-agent': s.ua, ...(range && { range }) } }).catch(() => null);
+    if (up?.ok) return audioResponse(up, s.mime);
+    if (up?.status === 416) return new Response(null, { status: 416, headers: { 'content-range': up.headers.get('content-range') ?? '' } });
+    await forget(c.env, key, { kv: true }); // URL expirée ou liée à une autre IP : on la redemande une fois
+  }
   fail(502, 'no_audio', BOT.test(reason) ? 'YouTube bloque temporairement la lecture depuis le serveur. Réessaie plus tard.' : reason);
 }
