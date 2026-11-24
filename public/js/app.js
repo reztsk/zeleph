@@ -11,6 +11,7 @@ import * as browse from './views/browse.js';
 import * as lib from './views/library.js';
 import * as social from './views/social.js';
 import { settings } from './views/settings.js';
+import { watchUpdates } from './update.js';
 
 applyTheme(localStorage.getItem('zeleph.theme')); // thème instantané avant la réponse du serveur
 
@@ -89,4 +90,5 @@ mountMini(mini);
   catch (e) { if (e.status === 401) showAuth(); else { showAuth(); toast(e.message); } }
 })();
 
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
+watchUpdates();

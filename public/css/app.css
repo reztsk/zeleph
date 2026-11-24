@@ -130,6 +130,7 @@ body.logged #tabs { display: flex; }
 .primary, .secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; padding: 0 20px; border-radius: 12px; font-size: 17px; font-weight: 600; }
 .primary { background: var(--accent); color: var(--on); box-shadow: var(--glow); }
 .secondary { background: var(--surface2); color: var(--accent); }
+a.secondary { text-decoration: none; }
 .primary:active, .secondary:active { opacity: .75; }
 .primary.loading { opacity: .6; pointer-events: none; }
 .link { color: var(--accent); font-size: 15px; padding: 10px 0; }

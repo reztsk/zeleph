@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { handle } from '../worker/index.js';
+import worker, { handle } from '../worker/index.js';
 import { createD1 } from './d1-shim.mjs';
 
 const fx = n => readFileSync(new URL(`./fixtures/${n}.json`, import.meta.url), 'utf8');
@@ -277,4 +277,24 @@ test('Flux audio : M4A, Range 206 (Safari iOS), cache ~4 h, nouvelle résolution
   assert.ok(calls.some(u => u.includes('id=BOTBLOCKED1') && u.includes('c=IOS')), 'repli IOS tenté puis sondé');
   assert.equal((await call('GET', '/stream/../../x', { cookie: A })).status, 404);
   assert.equal((await call('GET', '/stream/Tk-vgRMoPnY', { cookie: A, headers: { range: 'octets=0-1' } })).status, 416);
+});
+
+test('Version : /api/version (public, no-store) et sw.js / js/update.js estampillés sans 304', async () => {
+  const v = await handle(new Request('https://zeleph.test/api/version'), { ...env, APP_VERSION: '898ca3a-202611241405' }, ctx);
+  assert.equal(v.status, 200);
+  assert.deepEqual(await v.json(), { version: '898ca3a-202611241405' });
+  assert.equal(v.headers.get('cache-control'), 'no-store');
+  assert.deepEqual((await call('GET', '/version')).data, { version: 'dev' });
+  const ASSETS = { fetch: async u => {
+    assert.equal(typeof u, 'string', 'URL seule : aucun en-tête conditionnel transmis');
+    return new Response(readFileSync(new URL(`../public${new URL(u).pathname}`, import.meta.url), 'utf8'), { headers: { etag: '"x"', 'content-type': 'text/javascript' } });
+  } };
+  for (const p of ['/sw.js', '/js/update.js']) {
+    const r = await worker.fetch(new Request(`https://zeleph.test${p}`, { headers: { 'if-none-match': '"x"' } }), { ...env, ASSETS, APP_VERSION: 'abc1234-2026"<x>' }, ctx);
+    const t = await r.text();
+    assert.equal(r.status, 200);
+    assert.ok(t.includes('abc1234-2026x') && !t.includes('__APP_VERSION__'), p);
+    assert.equal(r.headers.get('cache-control'), 'no-cache');
+    assert.equal(r.headers.get('etag'), null);
+  }
 });

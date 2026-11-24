@@ -23,6 +23,7 @@ const DIR = join(tmpdir(), 'zeleph-audio');
 const MAX_FILES = Number(process.env.MAX_FILES || 300);
 const jobs = new Map();
 const run = promisify(execFile);
+const lastLine = s => String(s ?? '').trim().split('\n').pop().slice(0, 300); // raison lisible renvoyée au Worker (logs privés)
 await mkdir(DIR, { recursive: true });
 
 if (TOKEN.length < 24) { console.error('EXTRACTOR_TOKEN manquant ou trop court (24 caractères min.)'); process.exit(1); }
@@ -37,9 +38,9 @@ function resolve(id, fresh = false) {
   const hit = cache.get(id);
   if (!fresh && hit && hit.exp > Date.now()) return Promise.resolve(hit);
   return new Promise((ok, ko) => {
-    execFile(YTDLP, ['-f', '140/bestaudio[ext=m4a]', '--no-playlist', '--no-warnings', ...ARGS, '--print', '%(url)s', '--print', '%(http_headers.User-Agent)s', `https://www.youtube.com/watch?v=${id}`], { timeout: 45000 }, (err, out) => {
+    execFile(YTDLP, ['-f', '140/bestaudio[ext=m4a]', '--no-playlist', '--no-warnings', ...ARGS, '--print', '%(url)s', '--print', '%(http_headers.User-Agent)s', `https://www.youtube.com/watch?v=${id}`], { timeout: 45000 }, (err, out, errOut) => {
       const [url, ua] = String(out ?? '').trim().split('\n');
-      if (err || !url?.startsWith('https://')) return ko(new Error('extraction impossible'));
+      if (err || !url?.startsWith('https://')) return ko(new Error(`extraction impossible : ${lastLine(errOut || err?.message)}`));
       if (cache.size > 2000) cache.delete(cache.keys().next().value);
       const v = { url, ua: ua && ua !== 'NA' ? ua : 'Mozilla/5.0', exp: Date.now() + TTL };
       cache.set(id, v);
@@ -54,6 +55,7 @@ function remux(id) {
   if (jobs.has(id)) return jobs.get(id);
   const file = join(DIR, `${id}.m4a`);
   const p = stat(file).then(() => file, async () => {
+    let why = '';
     for (let i = 0; i < 2; i++) {
       const s = await resolve(id, i > 0);
       const part = `${file}.part`;
@@ -62,9 +64,9 @@ function remux(id) {
         await rename(part, file);
         prune();
         return file;
-      } catch { await unlink(part).catch(() => {}); } // URL expirée : nouvelle extraction une fois
+      } catch (e) { why = lastLine(e.stderr || e.message); await unlink(part).catch(() => {}); } // URL expirée : nouvelle extraction une fois
     }
-    throw new Error('remux impossible');
+    throw new Error(`remux impossible : ${why}`);
   }).finally(() => jobs.delete(id));
   jobs.set(id, p);
   return p;
@@ -99,5 +101,5 @@ createServer(async (req, res) => {
   try {
     const file = await remux(m[1]);
     serve(req, res, file, (await stat(file)).size);
-  } catch (e) { console.error(m[1], e.message); res.statusCode = 502; res.end(); }
+  } catch (e) { console.error(m[1], e.message); res.statusCode = 502; res.end(e.message); }
 }).listen(PORT, process.env.HOST || '0.0.0.0', () => console.log(`extracteur Zeleph sur ${process.env.HOST || '0.0.0.0'}:${PORT}`));

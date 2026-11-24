@@ -4,6 +4,7 @@ import { put, post } from '../api.js';
 import { back, session } from '../nav.js';
 import { THEMES, applyTheme } from '../themes.js';
 import { prefs, setPref, refreshTheme } from '../prefs.js';
+import { VERSION, checkUpdate } from '../update.js';
 
 export function settings(root, { onLogout }) {
   const me = session.me;
@@ -51,11 +52,19 @@ export function settings(root, { onLogout }) {
 
   const bgToggle = h('input', { type: 'checkbox', checked: prefs.coverBg, onchange: e => setPref('coverBg', e.target.checked) });
 
+  const upd = h('button.secondary', { type: 'button', onclick: async () => {
+    upd.disabled = true;
+    try { if (!await checkUpdate(true)) toast('Tu utilises déjà la dernière version'); } catch (x) { toast(x.message); } finally { upd.disabled = false; }
+  } }, 'Vérifier les mises à jour');
+
   body.append(
     section('Profil', profileForm),
     section('Thèmes', h('p.muted.small', {}, 'Appliqué tout de suite et enregistré sur ton compte.'), grid),
     section('Lecteur', h('label.switch-row', {}, h('span', {}, 'Fond du lecteur aux couleurs de la pochette'), bgToggle, h('span.switch'))),
     section('Sécurité', pw),
+    section('Application & Mises à jour',
+      h('p.muted.small', {}, 'Version installée : ', h('strong.version', {}, VERSION)),
+      h('div.btn-row', {}, upd, h('a.secondary', { href: 'https://github.com/reztsk/zeleph', target: '_blank', rel: 'noopener noreferrer' }, 'Dépôt GitHub'))),
     section(null, h('button.danger-btn', { type: 'button', onclick: onLogout }, icon('logout'), 'Se déconnecter')),
     h('p.muted.small.center', {}, 'Zeleph · audio YouTube sans publicité'),
   );

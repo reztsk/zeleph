@@ -8,8 +8,12 @@ import { stream } from './stream.js';
 import { lyrics } from './lyrics.js';
 
 const P = 'public', A = 'auth';
+// Version déployée (tools/deploy.mjs → APP_VERSION) ; « dev » en local.
+export const appVersion = env => String(env.APP_VERSION || 'dev').replace(/[^\w.-]/g, '');
+const STAMPED = new Set(['/sw.js', '/js/update.js']);
 // [méthode, motif, accès, action(c, ...paramètres)]
 const ROUTES = [
+  ['GET', /^\/api\/version$/, P, c => ({ version: appVersion(c.env) })],
   ['GET', /^\/api\/handle\/([^/]+)$/, P, (c, h) => auth.handleAvailable(c, decodeURIComponent(h))],
   ['POST', /^\/api\/auth\/signup$/, P, auth.signup],
   ['POST', /^\/api\/auth\/login$/, P, auth.login],
@@ -104,7 +108,14 @@ export async function handle(req, env, ctx) {
 
 export default {
   async fetch(request, env, ctx) {
-    if (new URL(request.url).pathname.startsWith('/api/')) return handle(request, env, ctx);
-    return env.ASSETS.fetch(request);
+    const { pathname } = new URL(request.url);
+    if (pathname.startsWith('/api/')) return handle(request, env, ctx);
+    if (!STAMPED.has(pathname)) return env.ASSETS.fetch(request);
+    // URL seule : jamais de 304 sur un fichier dont le contenu dépend de la version déployée.
+    const res = await env.ASSETS.fetch(request.url);
+    if (!res.ok) return res;
+    const h = new Headers(res.headers);
+    h.set('cache-control', 'no-cache'); h.delete('etag'); h.delete('content-length');
+    return new Response((await res.text()).replaceAll('__APP_VERSION__', appVersion(env)), { status: 200, headers: h });
   },
 };

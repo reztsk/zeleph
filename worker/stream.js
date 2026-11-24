@@ -21,7 +21,7 @@ async function viaExtractor(c, vid, range) {
     const up = await fetch(`${base}/audio/${vid}`, { method: c.req.method, headers: { authorization: `Bearer ${String(c.env.EXTRACTOR_TOKEN ?? '').trim().replace(/^﻿/, '')}`, ...(range && { range }) }, signal: ctl.signal });
     if (up.ok) return audioResponse(up, up.headers.get('content-type'));
     if (up.status === 416) return new Response(null, { status: 416, headers: { 'content-range': up.headers.get('content-range') ?? '' } });
-    console.error('extracteur : statut', up.status);
+    console.error('extracteur : statut', up.status, (await up.text().catch(() => '')).slice(0, 300));
   } catch (e) { console.error('extracteur : réseau', e.name); }
   finally { clearTimeout(t); }
   return null;

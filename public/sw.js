@@ -1,8 +1,8 @@
 // Service worker minimal : met en cache la coquille de l'app (démarrage instantané, icône écran d'accueil).
 // Jamais l'API ni l'audio (/api/*) : toujours en direct.
-const VERSION = 'zeleph-v1';
+const VERSION = 'zeleph-__APP_VERSION__'; // estampillé par le Worker à chaque déploiement → nouveau SW + anciens caches supprimés
 const SHELL = ['/', '/index.html', '/css/app.css', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/apple-touch-icon.png',
-  '/js/app.js', '/js/api.js', '/js/ui.js', '/js/nav.js', '/js/player.js', '/js/queue.js', '/js/lrc.js', '/js/themes.js', '/js/prefs.js', '/js/menu.js', '/js/nowplaying.js',
+  '/js/app.js', '/js/api.js', '/js/ui.js', '/js/nav.js', '/js/player.js', '/js/queue.js', '/js/lrc.js', '/js/themes.js', '/js/prefs.js', '/js/menu.js', '/js/nowplaying.js', '/js/update.js',
   '/js/views/auth.js', '/js/views/browse.js', '/js/views/library.js', '/js/views/social.js', '/js/views/settings.js'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });

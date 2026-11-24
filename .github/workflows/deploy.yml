@@ -1,0 +1,39 @@
+# Déploiement continu : chaque push sur main → tests → Worker zeleph sur Cloudflare (version = commit court + horodatage).
+# Secrets du dépôt : CLOUDFLARE_API_TOKEN (modèle « Edit Cloudflare Workers » + D1 Edit) et CLOUDFLARE_ACCOUNT_ID.
+# L'extracteur (extractor/) est reconstruit par Northflank directement depuis GitHub.
+name: Déploiement
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-zeleph
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Secret Cloudflare absent
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: |
+          echo "::error::Secret CLOUDFLARE_API_TOKEN manquant (Settings → Secrets and variables → Actions)."
+          exit 1
+      - name: Déployer le Worker
+        run: node tools/deploy.mjs
