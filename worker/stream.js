@@ -33,8 +33,9 @@ export async function stream(c, vid) {
   if (range && !/^bytes=\d*-\d*$/.test(range)) fail(416, 'bad_range', 'Plage invalide');
   const key = `au:${vid}`;
   let reason = 'Lecture impossible pour ce titre';
-  // Extracteur d'abord : il sert un M4A classique lisible par Safari iOS ; le flux direct (M4A DASH fragmenté) reste en secours.
-  if (c.env.EXTRACTOR_URL) { const r = await viaExtractor(c, vid, range); if (r) return r; }
+  // Extracteur seul quand il existe : le flux direct est un M4A DASH fragmenté sur lequel Safari iOS reste bloqué à 0:00
+  // sans erreur ; mieux vaut une erreur nette (le lecteur l'affiche et passe au titre suivant).
+  if (c.env.EXTRACTOR_URL) return (await viaExtractor(c, vid, range)) ?? fail(502, 'no_audio', 'Titre indisponible pour le moment, réessaie dans un instant.');
   for (let attempt = 0; attempt < 2; attempt++) {
     let s;
     try {

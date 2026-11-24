@@ -7,7 +7,7 @@ import * as yt from './yt.js';
 import { stream } from './stream.js';
 import { lyrics } from './lyrics.js';
 
-const P = 'public', A = 'auth';
+const P = 'public', A = 'auth', S = 'stream'; // S : session (cookie) ou jeton de flux signé (?t=)
 // Version déployée (tools/deploy.mjs → APP_VERSION) ; « dev » en local.
 export const appVersion = env => String(env.APP_VERSION || 'dev').replace(/[^\w.-]/g, '');
 const STAMPED = new Set(['/sw.js', '/js/update.js']);
@@ -51,8 +51,9 @@ const ROUTES = [
   ['GET', /^\/api\/collection\/([\w-]+)$/, A, (c, id) => yt.collection(c.env, id)],
   ['GET', /^\/api\/radio\/([\w-]+)$/, A, async (c, id) => ({ tracks: await yt.radio(c.env, id) })],
   ['GET', /^\/api\/lyrics$/, A, c => lyrics(c.env, Object.fromEntries(c.url.searchParams))],
-  ['GET', /^\/api\/stream\/([\w-]+)$/, A, stream],
-  ['HEAD', /^\/api\/stream\/([\w-]+)$/, A, stream],
+  ['GET', /^\/api\/stream-token$/, A, auth.streamToken],
+  ['GET', /^\/api\/stream\/([\w-]+)$/, S, stream],
+  ['HEAD', /^\/api\/stream\/([\w-]+)$/, S, stream],
 
   ['GET', /^\/api\/img\/u\/([^/]+)$/, A, async (c, h) => imageResponse((await one(c.db, 'SELECT avatar FROM users WHERE handle = ?1', auth.handle(decodeURIComponent(h))))?.avatar)],
   ['GET', /^\/api\/img\/p\/([\w-]+)$/, A, async (c, id) => imageResponse(ID_RE.test(id) ? (await one(c.db, 'SELECT cover FROM playlists WHERE id = ?1', id))?.cover : null)],
@@ -90,7 +91,7 @@ export async function handle(req, env, ctx) {
       }
     }
     c.user = await auth.authenticate(c);
-    if (route[2] === A && !c.user) fail(401, 'unauthorized', 'Connexion requise');
+    if ((route[2] === A && !c.user) || (route[2] === S && !c.user && !(await auth.streamAllowed(c)))) fail(401, 'unauthorized', 'Connexion requise');
     const out = await route[3](c, ...url.pathname.match(route[1]).slice(1));
     const res = out instanceof Response ? out : json(out);
     if (c.setCookie) res.headers.append('set-cookie', c.setCookie);

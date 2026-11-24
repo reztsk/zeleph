@@ -59,9 +59,12 @@ function startApp(me) {
   document.body.classList.add('logged');
   tabs.replaceChildren(...TABS.map(([p, l, ic]) => h('a.tab', { href: `#${p}`, 'data-root': p }, icon(ic), h('span', {}, l))));
   player.loadLikes();
-  player.restore();
+  streamToken().finally(player.restore); // jeton avant la 1re URL audio
   route();
 }
+// Jeton de flux (7 jours) : redemandé toutes les 6 h tant que l'app reste ouverte.
+const streamToken = () => get('/stream-token').then(r => player.setStreamToken(r.token)).catch(() => {});
+setInterval(() => { if (session.me) streamToken(); }, 6 * 36e5);
 
 async function logout() {
   try { await post('/auth/logout'); } catch { /* déjà déconnecté */ }
@@ -70,6 +73,7 @@ async function logout() {
 function showAuth() {
   session.me = null;
   player.audio.pause();
+  player.setStreamToken(null);
   try { localStorage.removeItem('zeleph.queue'); } catch { /* privé */ }
   document.body.classList.remove('logged', 'has-mini');
   view.replaceChildren(); tabs.replaceChildren(); mini.hidden = true;

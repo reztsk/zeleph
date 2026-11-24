@@ -41,6 +41,23 @@ export async function authenticate(c) {
   if (c.now - s.seen > 36e5) await run(c.db, 'UPDATE sessions SET seen = ?1 WHERE id = ?2', c.now, s.sid);
   return s;
 }
+// Jeton de flux « <session>.<expiration>.<hmac> » mis dans l'URL de /api/stream : le moteur audio d'iOS n'envoie pas
+// toujours le cookie. Lié à la session (mort à la déconnexion), clé = hash du secret de session (jamais exposé).
+const STREAM_TTL = 7 * 864e5;
+const sign = async (key, msg) => {
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return [...new Uint8Array(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(msg)))].map(b => b.toString(16).padStart(2, '0')).join('');
+};
+export async function streamToken(c) {
+  const msg = `${c.user.sid}.${c.now + STREAM_TTL}`;
+  return { token: `${msg}.${await sign(c.user.secret_hash, msg)}`, expires: c.now + STREAM_TTL };
+}
+export async function streamAllowed(c) {
+  const m = /^([0-9a-f-]{36})\.(\d{13})\.([0-9a-f]{64})$/.exec(c.url.searchParams.get('t') ?? '');
+  if (!m || +m[2] < c.now) return false;
+  const s = await one(c.db, 'SELECT secret_hash FROM sessions WHERE id = ?1', m[1]);
+  return !!s && safeEq(m[3], await sign(s.secret_hash, `${m[1]}.${m[2]}`));
+}
 export const avatarUrl = u => (u.avatar_v ? `/api/img/u/${u.handle}?v=${u.avatar_v}` : null);
 export const me = u => ({ id: u.id, handle: u.handle, name: u.name || u.handle, email: u.email, avatar: avatarUrl(u), theme: u.theme });
 

@@ -17,7 +17,9 @@ test('Extracteur : jeton exigé, Range 206, début et milieu du fichier', async 
   assert.equal((await fetch(`${base}/audio/bad`, { headers: auth })).status, 400);
   const r = await fetch(`${base}/audio/${VID}`, { headers: { ...auth, range: 'bytes=0-1023' } });
   assert.equal(r.status, 206);
-  assert.equal(new TextDecoder().decode(new Uint8Array(await r.arrayBuffer()).slice(4, 8)), 'ftyp');
+  const head = new TextDecoder('latin1').decode(new Uint8Array(await r.arrayBuffer()));
+  assert.equal(head.slice(4, 12), 'ftypM4A ', 'M4A classique, pas « dash » (Safari iOS)');
+  assert.ok(head.indexOf('moov') > 0 && (head.indexOf('mdat') === -1 || head.indexOf('moov') < head.indexOf('mdat')), 'moov en tête (faststart)');
   const m = await fetch(`${base}/audio/${VID}`, { headers: { ...auth, range: 'bytes=1500000-1500099' } });
   assert.equal(m.status, 206);
   assert.equal((await m.arrayBuffer()).byteLength, 100);

@@ -39,9 +39,18 @@ function position() {
   if (Number.isFinite(d) && d > 0) try { navigator.mediaSession.setPositionState({ duration: d, position: Math.min(audio.currentTime, d), playbackRate: audio.playbackRate || 1 }); } catch { /* valeurs transitoires */ }
 }
 
+// Jeton de flux signé dans l'URL : le moteur audio d'iOS n'envoie pas toujours le cookie de session.
+let streamTok = null;
+export const setStreamToken = t => { streamTok = t; };
+const src = id => `/api/stream/${id}${streamTok ? `?t=${streamTok}` : ''}`;
+// Garde-fou : Safari peut rester bloqué à 0:00 sans erreur → au bout de 50 s, on traite comme une erreur (titre suivant).
+let stall = 0;
+const guard = () => { clearTimeout(stall); stall = setTimeout(() => { if (!audio.paused && audio.readyState < 3 && audio.currentTime < 0.5) audio.dispatchEvent(new Event('error')); }, 50000); };
+
 function load(t, autoplay = true, at = 0) {
   if (!t) return;
-  audio.src = `/api/stream/${t.id}`;
+  audio.src = src(t.id);
+  if (autoplay) guard();
   if (at > 0) audio.addEventListener('loadedmetadata', () => { audio.currentTime = at; }, { once: true });
   metadata(t);
   emit('track');
@@ -63,7 +72,7 @@ function warmNext() {
   const n = queue.peek();
   if (!n || warmed === n.id) return;
   warmed = n.id;
-  fetch(`/api/stream/${n.id}`, { headers: { range: 'bytes=0-1' }, credentials: 'same-origin' }).catch(() => {});
+  fetch(src(n.id), { headers: { range: 'bytes=0-1' }, credentials: 'same-origin' }).catch(() => {});
   if (n.thumb) new Image().src = n.thumb;
 }
 
@@ -101,17 +110,19 @@ export async function toggleLike(t) {
 
 // ---------- Événements audio ----------
 audio.addEventListener('playing', () => {
+  clearTimeout(stall);
   errors = 0;
   emit('state');
   const t = queue.current;
   if (t && logged !== t.id) { logged = t.id; post('/history', { track: t }).catch(() => {}); }
   setTimeout(warmNext, 4000);
 });
-audio.addEventListener('pause', () => { emit('state'); save(); });
+audio.addEventListener('pause', () => { clearTimeout(stall); emit('state'); save(); });
 audio.addEventListener('ended', next);
 audio.addEventListener('timeupdate', () => emit('time'));
 audio.addEventListener('durationchange', () => { position(); emit('time'); });
 audio.addEventListener('error', () => {
+  clearTimeout(stall);
   if (!audio.src || !queue.current) return;
   errors++;
   toast(errors >= 3 ? 'Lecture impossible pour le moment' : `Titre indisponible : ${queue.current.title}`);

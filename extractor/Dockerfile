@@ -1,8 +1,9 @@
-# Extracteur audio Zeleph : Node (lance server.mjs) + python3 + ffmpeg + yt-dlp (mis à jour à chaque build via pip).
+# Extracteur audio Zeleph : Node (lance server.mjs, sert aussi de moteur JS à yt-dlp) + python3 + ffmpeg
+# + yt-dlp[default] (inclut les scripts de défis JS « ejs »), mis à jour à chaque build via pip.
 # Écoute sur 8080 ; GET /health → "ok". EXTRACTOR_TOKEN (24 car. min.) à passer à l'exécution, jamais dans l'image.
 FROM node:22-alpine
 RUN apk add --no-cache python3 py3-pip ffmpeg ca-certificates \
- && pip install --no-cache-dir --break-system-packages -U yt-dlp \
+ && pip install --no-cache-dir --break-system-packages -U "yt-dlp[default]" \
  && yt-dlp --version
 WORKDIR /app
 COPY server.mjs .

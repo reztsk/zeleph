@@ -53,6 +53,11 @@ globalThis.fetch = async (input, init = {}) => {
     const end = b === '' ? total - 1 : Math.min(+b, total - 1), len = end - +a + 1;
     return new Response(new Uint8Array(len).fill(7), { status: 206, headers: { 'content-type': 'audio/mp4', 'content-length': String(len), 'content-range': `bytes ${a}-${end}/${total}` } });
   }
+  if (url.startsWith('https://extracteur.test/audio/')) {
+    assert.equal(init.headers.authorization, 'Bearer jeton-extracteur');
+    if (url.endsWith('EXTFAIL0001')) return new Response('extraction impossible : Sign in to confirm', { status: 422 });
+    return new Response(new Uint8Array(2).fill(7), { status: 206, headers: { 'content-type': 'audio/mp4', 'content-length': '2', 'content-range': 'bytes 0-1/5000' } });
+  }
   if (url.startsWith('https://lrclib.net/api/get')) return Response.json({ syncedLyrics: '[00:01.00]Ligne une\n[00:05.00]Ligne deux', plainLyrics: 'Ligne une\nLigne deux', duration: 178 });
   return realFetch(input, init);
 };
@@ -297,4 +302,34 @@ test('Version : /api/version (public, no-store) et sw.js / js/update.js estampil
     assert.equal(r.headers.get('cache-control'), 'no-cache');
     assert.equal(r.headers.get('etag'), null);
   }
+});
+
+test('Flux : jeton signé dans l\'URL (sans cookie, iOS), falsifié refusé, mort à la déconnexion', async () => {
+  const C = await account('jeton_ios', 'jeton@zeleph.test');
+  const { data } = await call('GET', '/stream-token', { cookie: C });
+  assert.match(data.token, /^[0-9a-f-]{36}\.\d{13}\.[0-9a-f]{64}$/);
+  assert.ok(data.expires > Date.now() + 6 * 864e5);
+  assert.equal((await call('GET', `/stream/Tk-vgRMoPnY?t=${data.token}`, { headers: { range: 'bytes=0-1' } })).status, 206, 'jeton seul suffit');
+  assert.equal((await call('GET', '/stream/Tk-vgRMoPnY', { headers: { range: 'bytes=0-1' } })).status, 401, 'ni cookie ni jeton');
+  const bad = data.token.replace(/.$/, c => (c === '0' ? '1' : '0'));
+  assert.equal((await call('GET', `/stream/Tk-vgRMoPnY?t=${bad}`)).status, 401, 'signature falsifiée');
+  const old = data.token.replace(/\.\d{13}\./, `.${Date.now() - 1000}.`);
+  assert.equal((await call('GET', `/stream/Tk-vgRMoPnY?t=${old}`)).status, 401, 'expiration modifiée');
+  assert.equal((await call('GET', '/stream-token')).status, 401);
+  await call('POST', '/auth/logout', { cookie: C });
+  assert.equal((await call('GET', `/stream/Tk-vgRMoPnY?t=${data.token}`)).status, 401, 'session fermée = jeton mort');
+});
+
+test('Flux via extracteur : relayé tel quel, échec = 502 net sans repli DASH (Safari iOS bloqué à 0:00)', async () => {
+  const xenv = { ...env, EXTRACTOR_URL: 'https://extracteur.test/', EXTRACTOR_TOKEN: '\uFEFFjeton-extracteur ' };
+  const get = (id, cookie) => handle(new Request(`https://zeleph.test/api/stream/${id}`, { headers: { cookie, range: 'bytes=0-1' } }), xenv, ctx);
+  const ok = await get('Tk-vgRMoPnY', A);
+  assert.equal(ok.status, 206);
+  assert.equal(ok.headers.get('content-range'), 'bytes 0-1/5000');
+  assert.equal(ok.headers.get('content-type'), 'audio/mp4');
+  const n = calls.length;
+  const ko = await get('EXTFAIL0001', A);
+  assert.equal(ko.status, 502);
+  assert.equal((await ko.json()).error, 'no_audio');
+  assert.ok(!calls.slice(n).some(u => u.includes('googlevideo') || u.includes('/youtubei/v1/player')), 'aucun flux direct DASH');
 });
